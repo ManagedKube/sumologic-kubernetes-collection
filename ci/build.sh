@@ -91,12 +91,7 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ] && [[ ! 
 fi
 
 echo "Running tests"
-if ./tests/run_tests; then
-  echo "Tests passed"
-else
-  echo "Tests failed"
-  exit 1
-fi
+./tests/run_tests || (echo "Failed running tests" && exit 1)
 
 bundle_fluentd_plugins "${VERSION}" || (echo "Failed bundling fluentd plugins" && exit 1)
 
