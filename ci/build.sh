@@ -18,6 +18,31 @@ function get_branch_to_checkout() {
     || echo "${TRAVIS_BRANCH}"
 }
 
+function bundle_fluentd_plugin() {
+  local plugin_name="${1}"
+  local version="${2}"
+  # Strip everything after "-" (longest match) to avoid gem prerelease behavior
+  local gem_version="${version%%-*}"
+
+  cd "${plugin_name}" || exit 1
+
+  if [[ "${version}" == "" ]] ; then
+    echo "Please provide the version when bundling fluentd plugins"
+    exit 1
+  fi
+
+  echo "Building gem ${plugin_name} version ${gem_version} in $(pwd) ..."
+  sed -i.bak "s/0.0.0/${gem_version}/g" ./"${plugin_name}".gemspec
+  rm -f ./"${plugin_name}".gemspec.bak
+
+  echo "Install bundler..."
+  bundle install
+
+  echo "Build gem ${plugin_name} ${gem_version}..."
+  gem build "${plugin_name}"
+  mv ./*.gem ../deploy/docker/gems
+}
+
 function bundle_fluentd_plugins() {
   local version="${1}"
 
@@ -26,27 +51,11 @@ function bundle_fluentd_plugins() {
     exit 1
   fi
 
-  for i in ./fluent-plugin-*/ ; do
-    if [[ -d "${i}" ]]; then
-    (
-      cd "${i}" || exit 1
-      local plugin_name
-      plugin_name="$(basename "${i}")"
-      # Strip everything after "-" (longest match) to avoid gem prerelease behavior
-      local gem_version="${version%%-*}"
-      echo "Building gem ${plugin_name} version ${gem_version} in $(pwd) ..."
-      sed -i.bak "s/0.0.0/${gem_version}/g" ./"${plugin_name}".gemspec
-      rm -f ./"${plugin_name}".gemspec.bak
-
-      echo "Install bundler..."
-      bundle install
-
-      echo "Build gem ${plugin_name} ${gem_version}..."
-      gem build "${plugin_name}"
-      mv ./*.gem ../deploy/docker/gems
-    )
-    fi
-  done
+  find . -name 'fluent-plugin-*' -type 'd' -print |
+    while read -r line; do
+      # Run tests in their own context
+      (bundle_fluentd_plugin "$(basename "${line}")" "${version}") || exit 1
+    done
 }
 
 # Set up Github
