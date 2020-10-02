@@ -72,6 +72,9 @@ function set_up_github() {
   git checkout "${branch}"
 }
 
+echo "Running tests"
+./tests/run_tests || (echo "Failed running tests" && exit 1)
+
 # Set up Github
 if [ -n "$GITHUB_TOKEN" ]; then
   set_up_github "${GITHUB_TOKEN}" "${branch_to_checkout}"
@@ -91,9 +94,6 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ] && [[ ! 
     fi
   fi
 fi
-
-echo "Running tests"
-./tests/run_tests || (echo "Failed running tests" && exit 1)
 
 bundle_fluentd_plugins "${VERSION}" || (echo "Failed bundling fluentd plugins" && exit 1)
 
