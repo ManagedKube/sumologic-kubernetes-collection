@@ -58,22 +58,24 @@ function bundle_fluentd_plugins() {
     done
 }
 
-# Set up Github
-if [ -n "$GITHUB_TOKEN" ]; then
+function set_up_github() {
+  local token="${1}"
+  local branch="${2}"
+
   git config --global user.email "travis@travis-ci.org"
   git config --global user.name "Travis CI"
-  git remote add origin-repo "https://${GITHUB_TOKEN}@github.com/SumoLogic/sumologic-kubernetes-collection.git" > /dev/null 2>&1
+  git remote add origin-repo "https://${token}@github.com/SumoLogic/sumologic-kubernetes-collection.git" > /dev/null 2>&1
   git fetch --unshallow origin-repo
 
   readonly branch_to_checkout="$(get_branch_to_checkout)"
-  echo "Checking out the ${branch_to_checkout} branch..."
-  git checkout "${branch_to_checkout}"
-fi
+  echo "Checking out the ${branch} branch..."
+  git checkout "${branch}"
+}
 
-## check the build script with shellcheck
-## TODO: the "|| true" prevents the build from failing on shellcheck errors - to be removed
-echo "Checking the build script with shellcheck..."
-shellcheck ci/build.sh || true
+# Set up Github
+if [ -n "$GITHUB_TOKEN" ]; then
+  set_up_github "${GITHUB_TOKEN}" "${branch_to_checkout}"
+fi
 
 # Check for invalid changes to generated yaml files (non-Tag builds)
 # Exclude branches that start with "revert-" to allow reverts
