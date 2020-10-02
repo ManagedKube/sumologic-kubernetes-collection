@@ -72,6 +72,35 @@ function set_up_github() {
   git checkout "${branch}"
 }
 
+function push_docker_image() {
+  local version="$1"
+
+  echo "Tagging docker image $DOCKER_TAG:local with $DOCKER_TAG:$version..."
+  docker tag "$DOCKER_TAG:local" "$DOCKER_TAG:$version"
+  echo "Pushing docker image $DOCKER_TAG:$version..."
+  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  docker push "$DOCKER_TAG:$version"
+}
+
+function push_helm_chart() {
+  local version="$1"
+
+  echo "Pushing new Helm Chart release $version"
+  set -x
+  git checkout -- .
+  sudo helm init --client-only
+  sudo helm repo add falcosecurity https://falcosecurity.github.io/charts
+  sudo helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+  sudo helm package deploy/helm/sumologic --dependency-update --version="$version" --app-version="$version"
+  git fetch origin-repo
+  git checkout gh-pages
+  sudo helm repo index ./ --url https://sumologic.github.io/sumologic-kubernetes-collection/
+  git add -A
+  git commit -m "Push new Helm Chart release $version"
+  git push --quiet origin-repo gh-pages
+  set +x
+}
+
 echo "Running tests"
 ./tests/run_tests || (echo "Failed running tests" && exit 1)
 
@@ -214,35 +243,6 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
     echo "No changes in the generated overrides files."
   fi
 fi
-
-function push_docker_image() {
-  local version="$1"
-
-  echo "Tagging docker image $DOCKER_TAG:local with $DOCKER_TAG:$version..."
-  docker tag "$DOCKER_TAG:local" "$DOCKER_TAG:$version"
-  echo "Pushing docker image $DOCKER_TAG:$version..."
-  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-  docker push "$DOCKER_TAG:$version"
-}
-
-function push_helm_chart() {
-  local version="$1"
-
-  echo "Pushing new Helm Chart release $version"
-  set -x
-  git checkout -- .
-  sudo helm init --client-only
-  sudo helm repo add falcosecurity https://falcosecurity.github.io/charts
-  sudo helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-  sudo helm package deploy/helm/sumologic --dependency-update --version="$version" --app-version="$version"
-  git fetch origin-repo
-  git checkout gh-pages
-  sudo helm repo index ./ --url https://sumologic.github.io/sumologic-kubernetes-collection/
-  git add -A
-  git commit -m "Push new Helm Chart release $version"
-  git push --quiet origin-repo gh-pages
-  set +x
-}
 
 if [ -n "$DOCKER_PASSWORD" ] && [ -n "$TRAVIS_TAG" ]; then
   push_docker_image "$VERSION"
