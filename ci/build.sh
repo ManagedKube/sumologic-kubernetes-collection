@@ -67,7 +67,7 @@ function set_up_github() {
   git remote add origin-repo "https://${token}@github.com/SumoLogic/sumologic-kubernetes-collection.git" > /dev/null 2>&1
   git fetch --unshallow origin-repo
 
-  readonly branch_to_checkout="$(get_branch_to_checkout)"
+  readonly branch="$(get_branch_to_checkout)"
   echo "Checking out the ${branch} branch..."
   git checkout "${branch}"
 }
@@ -251,7 +251,7 @@ echo "Running tests"
 
 # Set up Github
 if [ -n "$GITHUB_TOKEN" ]; then
-  set_up_github "${GITHUB_TOKEN}" "${branch_to_checkout}"
+  set_up_github "${GITHUB_TOKEN}" "$(get_branch_to_checkout)"
 fi
 
 # Check for invalid changes to generated yaml files (non-Tag builds)
