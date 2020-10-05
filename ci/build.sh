@@ -117,6 +117,25 @@ function validate_changes_to_generated_files() {
   fi
 }
 
+function build_docker_image() {
+  local tag
+  local no_cache
+  tag="${1}"
+
+  echo "Building docker image with ${tag}:local in $(pwd)..."
+  cd ./deploy/docker || exit 1
+  no_cache="--no-cache"
+  if [[ "$DOCKER_USE_CACHE" == "true" ]]; then
+    no_cache=""
+  fi
+  docker build . -f ./Dockerfile -t "${tag}:local" ${no_cache:+"--no-cache"}
+  rm -f ./gems/*.gem
+  cd ../.. || exit 1
+
+  echo "Test docker image locally..."
+  ruby deploy/test/test_docker.rb || exit 1
+}
+
 echo "Running tests"
 ./tests/run_tests || (echo "Failed running tests" && exit 1)
 
@@ -132,19 +151,7 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ] && [[ ! 
 fi
 
 bundle_fluentd_plugins "${VERSION}" || (echo "Failed bundling fluentd plugins" && exit 1)
-
-echo "Building docker image with $DOCKER_TAG:local in $(pwd)..."
-cd ./deploy/docker || exit 1
-no_cache="--no-cache"
-if [[ "$DOCKER_USE_CACHE" == "true" ]]; then
-  no_cache=""
-fi
-docker build . -f ./Dockerfile -t "$DOCKER_TAG:local" ${no_cache:+"--no-cache"}
-rm -f ./gems/*.gem
-cd ../.. || exit 1
-
-echo "Test docker image locally..."
-ruby deploy/test/test_docker.rb
+build_docker_image "${DOCKER_TAG}" || (echo "Error during building docker image" && exit 1)
 
 # Check for changes that require re-generating overrides yaml files
 if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
