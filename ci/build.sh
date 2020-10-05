@@ -136,25 +136,13 @@ function build_docker_image() {
   ruby deploy/test/test_docker.rb || exit 1
 }
 
-echo "Running tests"
-./tests/run_tests || (echo "Failed running tests" && exit 1)
+function generate_overrides() {
+  local with_files
+  local prometheus_remote_write
+  local branch
 
-# Set up Github
-if [ -n "$GITHUB_TOKEN" ]; then
-  set_up_github "${GITHUB_TOKEN}" "${branch_to_checkout}"
-fi
+  branch="${1}"
 
-# Check for invalid changes to generated yaml files (non-Tag builds)
-# Exclude branches that start with "revert-" to allow reverts
-if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ] && [[ ! "$TRAVIS_PULL_REQUEST_BRANCH" =~ ^revert- ]]; then
-  validate_changes_to_generated_files || (echo "Aborting due to manual changes detected in generated files" && exit 1)
-fi
-
-bundle_fluentd_plugins "${VERSION}" || (echo "Failed bundling fluentd plugins" && exit 1)
-build_docker_image "${DOCKER_TAG}" || (echo "Error during building docker image" && exit 1)
-
-# Check for changes that require re-generating overrides yaml files
-if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
   echo "Generating deployment yaml from helm chart..."
   echo "# This file is auto-generated." > deploy/kubernetes/fluentd-sumologic.yaml.tmpl
   sudo helm init --client-only
@@ -178,10 +166,10 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
     --set sumologic.accessKey="bogus"
 
   if [[ $(git diff deploy/kubernetes/fluentd-sumologic.yaml.tmpl) ]]; then
-      echo "Detected changes in 'fluentd-sumologic.yaml.tmpl', committing the updated version to $TRAVIS_PULL_REQUEST_BRANCH..."
+      echo "Detected changes in 'fluentd-sumologic.yaml.tmpl', committing the updated version to ${branch}..."
       git add deploy/kubernetes/fluentd-sumologic.yaml.tmpl
       git commit -m "Generate new 'fluentd-sumologic.yaml.tmpl'"
-      git push --quiet origin-repo "$TRAVIS_PULL_REQUEST_BRANCH"
+      git push --quiet origin-repo "${branch}"
   else
       echo "No changes in 'fluentd-sumologic.yaml.tmpl'."
   fi
@@ -202,10 +190,10 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
     --set sumologic.clusterName="\$CLUSTER_NAME"
 
   if [[ $(git diff deploy/kubernetes/setup-sumologic.yaml.tmpl) ]]; then
-      echo "Detected changes in 'setup-sumologic.yaml.tmpl', committing the updated version to $TRAVIS_PULL_REQUEST_BRANCH..."
+      echo "Detected changes in 'setup-sumologic.yaml.tmpl', committing the updated version to ${branch}..."
       git add deploy/kubernetes/setup-sumologic.yaml.tmpl
       git commit -m "Generate new 'setup-sumologic.yaml.tmpl'"
-      git push --quiet origin-repo "$TRAVIS_PULL_REQUEST_BRANCH"
+      git push --quiet origin-repo "${branch}"
   else
       echo "No changes in 'setup-sumologic.yaml.tmpl'."
   fi
@@ -252,10 +240,32 @@ if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
     git add deploy/helm/*-overrides.yaml
     git add deploy/kubernetes/kube-prometheus-sumo-logic-mixin.libsonnet
     git commit -m "Generate new overrides yaml/libsonnet file(s)."
-    git push --quiet origin-repo "$TRAVIS_PULL_REQUEST_BRANCH"
+    git push --quiet origin-repo "${branch}"
   else
     echo "No changes in the generated overrides files."
   fi
+}
+
+echo "Running tests"
+./tests/run_tests || (echo "Failed running tests" && exit 1)
+
+# Set up Github
+if [ -n "$GITHUB_TOKEN" ]; then
+  set_up_github "${GITHUB_TOKEN}" "${branch_to_checkout}"
+fi
+
+# Check for invalid changes to generated yaml files (non-Tag builds)
+# Exclude branches that start with "revert-" to allow reverts
+if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ] && [[ ! "$TRAVIS_PULL_REQUEST_BRANCH" =~ ^revert- ]]; then
+  validate_changes_to_generated_files || (echo "Aborting due to manual changes detected in generated files" && exit 1)
+fi
+
+bundle_fluentd_plugins "${VERSION}" || (echo "Failed bundling fluentd plugins" && exit 1)
+build_docker_image "${DOCKER_TAG}" || (echo "Error during building docker image" && exit 1)
+
+# Check for changes that require re-generating overrides yaml files
+if [ -n "$GITHUB_TOKEN" ] && [ "$TRAVIS_EVENT_TYPE" == "pull_request" ]; then
+  generate_overrides "${TRAVIS_PULL_REQUEST_BRANCH}" || (echo "Error generating override files" && exit 1)
 fi
 
 if [ -n "$DOCKER_PASSWORD" ] && [ -n "$TRAVIS_TAG" ]; then
