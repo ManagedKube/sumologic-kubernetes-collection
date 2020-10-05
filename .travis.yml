@@ -10,10 +10,15 @@ before_install:
   - sudo chmod +x /usr/local/bin/yq-3.2.1
   - sudo ln -s /usr/local/bin/yq-3.2.1 /usr/local/bin/yq
   - sudo apt install shellcheck
-script: bash ci/build.sh
 branches:
   only:
   - master
   - /^release-v\d+\.\d+$/
   - /^v\d+\.\d+\.\d+$/
   - /^v\d+\.\d+\.\d+-(alpha|beta|rc)\.\d+$/
+jobs:
+  include:
+    - stage: tests
+      script: bash ci/run-tests.sh
+    - stage: build
+      script: bash ci/build.sh

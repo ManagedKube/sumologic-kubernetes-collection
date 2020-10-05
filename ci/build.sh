@@ -246,9 +246,6 @@ function generate_overrides() {
   fi
 }
 
-echo "Running tests"
-./ci/run-tests.sh || (echo "Failed running tests" && exit 1)
-
 # Set up Github
 if [ -n "$GITHUB_TOKEN" ]; then
   set_up_github "${GITHUB_TOKEN}" "$(get_branch_to_checkout)"
