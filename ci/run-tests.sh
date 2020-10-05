@@ -4,6 +4,9 @@ set -e
 VERSION="${TRAVIS_TAG:-0.0.0}"
 VERSION="${VERSION#v}"
 
+readonly ROOT_DIR="$(dirname "$(dirname "${0}")")"
+cd "${ROOT_DIR}"
+
 function test_fluentd_plugin() {
   local plugin_name="${1}"
   local version="${2}"
